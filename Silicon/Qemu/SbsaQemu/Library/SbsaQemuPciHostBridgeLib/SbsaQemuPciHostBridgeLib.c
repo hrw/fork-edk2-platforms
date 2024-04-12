@@ -6,10 +6,13 @@
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
+#include <IndustryStandard/Pci.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PciHostBridgeLib.h>
+#include <Library/PciLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 
 #include <PiDxe.h>
@@ -123,6 +126,62 @@ STATIC PCI_ROOT_BRIDGE mRootBridge = {
   (EFI_DEVICE_PATH_PROTOCOL *)&mEfiPciRootBridgeDevicePath,
 };
 
+EFI_STATUS
+EFIAPI
+PciHostBridgeUtilityInitRootBridge (
+  IN PCI_ROOT_BRIDGE   BaseBus,
+  IN UINTN             RootBusNumber,
+  OUT PCI_ROOT_BRIDGE  *RootBus
+  )
+{
+  EFI_PCI_ROOT_BRIDGE_DEVICE_PATH  *DevicePath;
+  UINTN                            MaxSubBusNumber = 255;
+
+  //
+  // Be safe if other fields are added to PCI_ROOT_BRIDGE later.
+  //
+  ZeroMem (RootBus, sizeof *RootBus);
+
+  RootBus->Segment = 0;
+
+  RootBus->Supports   = BaseBus.Supports;
+  RootBus->Attributes = BaseBus.Attributes;
+
+  RootBus->DmaAbove4G = BaseBus.DmaAbove4G;
+
+  RootBus->AllocationAttributes = BaseBus.AllocationAttributes;
+  RootBus->Bus.Base             = RootBusNumber;
+  RootBus->Bus.Limit            = MaxSubBusNumber;
+  CopyMem (&RootBus->Io, &BaseBus.Io, sizeof (PCI_ROOT_BRIDGE_APERTURE));
+  CopyMem (&RootBus->Mem, &BaseBus.Mem, sizeof (PCI_ROOT_BRIDGE_APERTURE));
+  CopyMem (&RootBus->MemAbove4G, &BaseBus.MemAbove4G, sizeof (PCI_ROOT_BRIDGE_APERTURE));
+  CopyMem (&RootBus->PMem, &BaseBus.PMem, sizeof (PCI_ROOT_BRIDGE_APERTURE));
+  CopyMem (&RootBus->PMemAbove4G, &BaseBus.PMemAbove4G, sizeof (PCI_ROOT_BRIDGE_APERTURE));
+
+  RootBus->NoExtendedConfigSpace = BaseBus.NoExtendedConfigSpace;
+
+  DevicePath = AllocateCopyPool (
+                 sizeof mEfiPciRootBridgeDevicePath,
+                 &mEfiPciRootBridgeDevicePath
+                 );
+  if (DevicePath == NULL) {
+    DEBUG ((DEBUG_ERROR, "%a: %r\n", __func__, EFI_OUT_OF_RESOURCES));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  DevicePath->AcpiDevicePath.UID = RootBusNumber;
+  RootBus->DevicePath            = (EFI_DEVICE_PATH_PROTOCOL *)DevicePath;
+
+  DEBUG ((
+    DEBUG_INFO,
+    "%a: populated root bus %d, with room for %d subordinate bus(es)\n",
+    __func__,
+    RootBusNumber,
+    MaxSubBusNumber - RootBusNumber
+    ));
+  return EFI_SUCCESS;
+}
+
 /**
   Return all the root bridge instances in an array.
 
@@ -138,8 +197,65 @@ PciHostBridgeGetRootBridges (
   UINTN *Count
   )
 {
+  PCI_ROOT_BRIDGE  *Bridges;
+  int  RootBridgeNumber, BusMin = 1, BusMax = 255;
+  int  AvailableBusses[255] = { 0 }, Index = 0;
+
   *Count = 1;
-  return &mRootBridge;
+
+  //
+  // Scan all other root buses. If function 0 of any device on a bus returns a
+  // VendorId register value different from all-bits-one, then that bus is
+  // alive.
+  //
+  for (RootBridgeNumber = BusMin + 1;
+       RootBridgeNumber <= BusMax;
+       ++RootBridgeNumber)
+  {
+    UINTN  Device;
+
+    for (Device = 0; Device <= PCI_MAX_DEVICE; ++Device) {
+      if (PciRead16 (
+            PCI_LIB_ADDRESS (
+              RootBridgeNumber,
+              Device,
+              0,
+              PCI_VENDOR_ID_OFFSET
+              )
+            ) != MAX_UINT16)
+      {
+        break;
+      }
+    }
+
+    if (Device <= PCI_MAX_DEVICE) {
+      DEBUG ((DEBUG_ERROR, "%a: found bus: %d\n", __func__, RootBridgeNumber));
+      AvailableBusses[Index++] = RootBridgeNumber;
+      *Count += 1;
+    }
+  }
+
+  //
+  // Allocate the "main" root bridge, and any extra root bridges.
+  //
+  Bridges = AllocatePool (*Count * sizeof *Bridges);
+  if (Bridges == NULL) {
+    DEBUG ((DEBUG_ERROR, "%a: %r\n", __func__, EFI_OUT_OF_RESOURCES));
+    return NULL;
+  }
+
+  Bridges[0] = mRootBridge;
+
+  for (int Index = 0; Index < *Count; Index++) {
+    if (AvailableBusses[Index] == 0) {
+      break;
+    }
+
+    DEBUG ((DEBUG_ERROR, "%a: copied %d bus %d\n", __func__, Index, AvailableBusses[Index]));
+    PciHostBridgeUtilityInitRootBridge (mRootBridge, AvailableBusses[Index], &Bridges[Index + 1]);
+  }
+
+  return Bridges;
 }
 
 /**
@@ -156,7 +272,7 @@ PciHostBridgeFreeRootBridges (
   UINTN           Count
   )
 {
-  ASSERT (Count == 1);
+  // ASSERT (Count == 1);
 }
 
 /**
