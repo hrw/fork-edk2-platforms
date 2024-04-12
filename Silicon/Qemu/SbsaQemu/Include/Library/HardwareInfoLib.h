@@ -15,6 +15,12 @@ typedef struct{
   UINT64  AddressSize;
 } MemoryInfo;
 
+typedef struct{
+  UINT64  DistributorBase;
+  UINT64  RedistributorsBase;
+  UINT64  ItsBase;
+} GicInfo;
+
 /**
   Get CPU count from information passed by Qemu.
 
@@ -81,6 +87,11 @@ GetMemInfo (
 UINT64
 GetNumaNodeCount (
   VOID
+  );
+
+VOID
+GetGicDetails(
+  OUT GicInfo *GicInfo
   );
 
 #endif /* HARDWARE_INFO_LIB */

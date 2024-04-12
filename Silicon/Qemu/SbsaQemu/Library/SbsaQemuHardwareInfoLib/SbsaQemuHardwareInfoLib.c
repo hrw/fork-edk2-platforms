@@ -179,3 +179,29 @@ GetNumaNodeCount (
 
   return NumberNumaNodes;
 }
+
+VOID
+GetGicDetails(
+  OUT GicInfo *GicInfo
+  )
+{
+  UINTN                          Arg0;
+  UINTN                          Arg1;
+  UINTN                          SmcResult;
+
+  SmcResult = ArmCallSmc0 (SIP_SVC_GET_GIC, &Arg0, &Arg1, NULL);
+  if (SmcResult == SMC_ARCH_CALL_SUCCESS) {
+    GicInfo->DistributorBase = Arg0;
+    GicInfo->RedistributorsBase = Arg1;
+  }
+
+  DEBUG ((DEBUG_INFO, "GICD base: 0x%x\n", Arg0));
+  DEBUG ((DEBUG_INFO, "GICR base: 0x%x\n", Arg1));
+
+  SmcResult = ArmCallSmc0 (SIP_SVC_GET_GIC_ITS, &Arg0, NULL, NULL);
+  if (SmcResult == SMC_ARCH_CALL_SUCCESS) {
+    GicInfo->ItsBase = Arg0;
+  }
+
+  DEBUG ((DEBUG_INFO, "GICI base: 0x%x\n", Arg0));
+}

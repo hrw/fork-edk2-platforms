@@ -31,6 +31,7 @@
   ArmSmcLib
   PcdLib
   DebugLib
+  HardwareInfoLib
   NonDiscoverableDeviceRegistrationLib
   UefiDriverEntryPoint
 

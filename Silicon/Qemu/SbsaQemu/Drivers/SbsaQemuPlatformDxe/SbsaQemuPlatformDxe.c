@@ -10,6 +10,7 @@
 #include <Library/ArmSmcLib.h>
 #include <Library/BaseLib.h>
 #include <Library/DebugLib.h>
+#include <Library/HardwareInfoLib.h>
 #include <Library/NonDiscoverableDeviceRegistrationLib.h>
 #include <Library/PcdLib.h>
 #include <Library/UefiBootServicesTableLib.h>
@@ -31,6 +32,7 @@ InitializeSbsaQemuPlatformDxe (
   UINTN                          Arg1;
   UINTN                          SmcResult;
   RETURN_STATUS                  Result;
+  GicInfo                        GicInfo;
 
   DEBUG ((DEBUG_INFO, "%a: InitializeSbsaQemuPlatformDxe called\n", __FUNCTION__));
 
@@ -69,31 +71,11 @@ InitializeSbsaQemuPlatformDxe (
 
   DEBUG ((DEBUG_INFO, "Platform version: %d.%d\n", Arg0, Arg1));
 
-  SmcResult = ArmCallSmc0 (SIP_SVC_GET_GIC, &Arg0, &Arg1, NULL);
-  if (SmcResult == SMC_ARCH_CALL_SUCCESS) {
-    Result = PcdSet64S (PcdGicDistributorBase, Arg0);
-    ASSERT_RETURN_ERROR (Result);
-    Result = PcdSet64S (PcdGicRedistributorsBase, Arg1);
-    ASSERT_RETURN_ERROR (Result);
-  }
+  GetGicDetails(&GicInfo);
 
-  Arg0 = PcdGet64 (PcdGicDistributorBase);
-
-  DEBUG ((DEBUG_INFO, "GICD base: 0x%x\n", Arg0));
-
-  Arg0 = PcdGet64 (PcdGicRedistributorsBase);
-
-  DEBUG ((DEBUG_INFO, "GICR base: 0x%x\n", Arg0));
-
-  SmcResult = ArmCallSmc0 (SIP_SVC_GET_GIC_ITS, &Arg0, NULL, NULL);
-  if (SmcResult == SMC_ARCH_CALL_SUCCESS) {
-    Result = PcdSet64S (PcdGicItsBase, Arg0);
-    ASSERT_RETURN_ERROR (Result);
-  }
-
-  Arg0 = PcdGet64 (PcdGicItsBase);
-
-  DEBUG ((DEBUG_INFO, "GICI base: 0x%x\n", Arg0));
+  Result = PcdSet64S (PcdGicDistributorBase, GicInfo.DistributorBase);
+  Result = PcdSet64S (PcdGicRedistributorsBase, GicInfo.RedistributorsBase);
+  Result = PcdSet64S (PcdGicItsBase, GicInfo.ItsBase);
 
   if (!PLATFORM_VERSION_LESS_THAN (0, 3)) {
     Base = (VOID *)(UINTN)PcdGet64 (PcdPlatformXhciBase);
