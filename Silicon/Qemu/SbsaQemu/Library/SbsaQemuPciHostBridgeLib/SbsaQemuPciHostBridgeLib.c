@@ -272,7 +272,7 @@ PciHostBridgeFreeRootBridges (
   UINTN           Count
   )
 {
-  // ASSERT (Count == 1);
+  FreePool (Bridges);
 }
 
 /**

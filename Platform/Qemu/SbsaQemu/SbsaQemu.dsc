@@ -173,6 +173,8 @@ DEFINE NETWORK_HTTP_BOOT_ENABLE       = FALSE
   ReportStatusCodeLib|MdePkg/Library/BaseReportStatusCodeLibNull/BaseReportStatusCodeLibNull.inf
 
   AcpiLib|EmbeddedPkg/Library/AcpiLib/AcpiLib.inf
+  AcpiHelperLib|DynamicTablesPkg/Library/Common/AcpiHelperLib/AcpiHelperLib.inf
+  AmlLib|DynamicTablesPkg/Library/Common/AmlLib/AmlLib.inf
 
   ArmLib|ArmPkg/Library/ArmLib/ArmBaseLib.inf
   ArmMmuLib|ArmPkg/Library/ArmMmuLib/ArmMmuBaseLib.inf

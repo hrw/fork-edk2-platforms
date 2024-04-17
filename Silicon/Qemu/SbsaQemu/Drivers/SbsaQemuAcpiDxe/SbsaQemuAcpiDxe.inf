@@ -18,18 +18,23 @@
 
 [Sources]
   SbsaQemuAcpiDxe.c
+  SbsaQemuAcpiPcie.c
+  SsdtTemplate.asl
 
 [Packages]
   ArmPkg/ArmPkg.dec
   ArmPlatformPkg/ArmPlatformPkg.dec
   ArmVirtPkg/ArmVirtPkg.dec
+  DynamicTablesPkg/DynamicTablesPkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
   MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
   Silicon/Qemu/SbsaQemu/SbsaQemu.dec
 
 [LibraryClasses]
+  AcpiHelperLib
   AcpiLib
+  AmlLib
   ArmLib
   BaseMemoryLib
   BaseLib
@@ -37,6 +42,7 @@
   DxeServicesLib
   HardwareInfoLib
   PcdLib
+  PciLib
   PrintLib
   UefiDriverEntryPoint
   UefiLib
@@ -54,7 +60,8 @@
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdSmmuBase
 
 [Depex]
-  gEfiAcpiTableProtocolGuid                       ## CONSUMES
+  gEfiPciIoProtocolGuid             ## CONSUMES
+  #gEfiAcpiTableProtocolGuid                       ## CONSUMES
 
 [Guids]
   gEdkiiPlatformHasAcpiGuid
@@ -62,6 +69,7 @@
 [Protocols]
   gEfiAcpiSdtProtocolGuid
   gEfiAcpiTableProtocolGuid                       ## CONSUMES
+  gEfiPciRootBridgeIoProtocolGuid             ## CONSUMES
 
 [FixedPcd]
   gEfiMdeModulePkgTokenSpaceGuid.PcdAcpiDefaultCreatorId
@@ -75,3 +83,21 @@
   gArmTokenSpaceGuid.PcdArmArchTimerHypIntrNum
   gArmTokenSpaceGuid.PcdArmArchTimerVirtIntrNum
   gArmTokenSpaceGuid.PcdArmArchTimerHypVirtIntrNum
+
+  gArmTokenSpaceGuid.PcdPciBusMin
+  gArmTokenSpaceGuid.PcdPciBusMax
+
+  gArmTokenSpaceGuid.PcdPciIoBase
+  gArmTokenSpaceGuid.PcdPciIoSize
+  gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciIoLimit
+
+  gArmTokenSpaceGuid.PcdPciMmio32Base
+  gArmTokenSpaceGuid.PcdPciMmio32Size
+  gEfiMdePkgTokenSpaceGuid.PcdPciMmio32Translation
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio32Limit
+
+  gArmTokenSpaceGuid.PcdPciMmio64Base
+  gArmTokenSpaceGuid.PcdPciMmio64Size
+  gEfiMdePkgTokenSpaceGuid.PcdPciMmio64Translation
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio64Limit
