@@ -6,27 +6,26 @@
 *  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
-#include <IndustryStandard/Acpi.h>
-#include <IndustryStandard/AcpiAml.h>
 #include <IndustryStandard/IoRemappingTable.h>
 #include <IndustryStandard/SbsaQemuAcpi.h>
 #include <IndustryStandard/SbsaQemuPlatformVersion.h>
+
 #include <Library/AcpiLib.h>
+#include <Library/AmlLib/AmlLib.h>
 #include <Library/ArmLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
-#include <Library/MemoryAllocationLib.h>
-#include <Library/PcdLib.h>
-#include <Library/PrintLib.h>
 #include <Library/HardwareInfoLib.h>
+#include <Library/PrintLib.h>
 #include <Library/UefiBootServicesTableLib.h>
-#include <Library/UefiDriverEntryPoint.h>
-#include <Library/UefiLib.h>
+
 #include <Protocol/AcpiTable.h>
+#include <Protocol/PciRootBridgeIo.h>
+
 #include "SbsaQemuAcpiDxe.h"
+#include "SbsaQemuAcpiPcie.h"
 
 #pragma pack(1)
-
 
 static UINTN GicItsBase;
 
@@ -36,7 +35,7 @@ static UINTN GicItsBase;
  * A Function to Compute the ACPI Table Checksum
  */
 VOID
-AcpiPlatformChecksum (
+AcpiTableChecksum (
   IN UINT8      *Buffer,
   IN UINTN      Size
   )
@@ -189,7 +188,7 @@ AddIortTable (
   CopyMem (New, &Rc, sizeof (SBSA_EFI_ACPI_6_0_IO_REMAPPING_RC_NODE));
   New += sizeof (SBSA_EFI_ACPI_6_0_IO_REMAPPING_RC_NODE);
 
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -314,7 +313,7 @@ AddMadtTable (
     New += sizeof (EFI_ACPI_6_5_GIC_ITS_STRUCTURE);
   }
 
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -467,7 +466,7 @@ AddSsdtTable (
   }
 
   // Perform Checksum
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -572,7 +571,7 @@ AddPpttTable (
   }
 
   // Perform Checksum
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -667,7 +666,7 @@ AddGtdtTable (
   New += sizeof (EFI_ACPI_6_3_GTDT_SBSA_GENERIC_WATCHDOG_STRUCTURE);
 
   // Perform Checksum
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -752,7 +751,7 @@ AddSratTable (
   }
 
   // Perform Checksum
-  AcpiPlatformChecksum ((UINT8*) PageAddress, TableSize);
+  AcpiTableChecksum ((UINT8*) PageAddress, TableSize);
 
   Status = AcpiTable->InstallAcpiTable (
                         AcpiTable,
@@ -832,6 +831,58 @@ DisableXhciOnOlderPlatVer (
   return Status;
 }
 
+/** Adds the SSDT ACPI table with PCIe nodes.
+
+  @param AcpiTable        The ACPI Table.
+
+  @return EFI_SUCCESS on success, or an error code.
+
+**/
+STATIC
+EFI_STATUS
+AddSsdtPcieTable (
+  IN  EFI_ACPI_TABLE_PROTOCOL  *AcpiTable
+  )
+{
+  EFI_STATUS                   Status;
+  UINTN                        TableHandle;
+  EFI_ACPI_DESCRIPTION_HEADER  *Table;
+  AML_ROOT_NODE_HANDLE         RootNode;
+  AML_OBJECT_NODE_HANDLE       ScopeNode;
+
+  Status = AmlCodeGenDefinitionBlock ("SSDT", "LINARO", "SBSAQEMU", 0x1, &RootNode);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((
+      DEBUG_ERROR,
+      "ERROR: SSDT: AmlCodeGenDefinitionBlock failed."
+      " Status = %r\n",
+      Status
+      ));
+  }
+
+  AmlCodeGenScope ("_SB_", RootNode, &ScopeNode);
+
+  AddPcieHostBridges(ScopeNode);
+
+  // Serialize the tree.
+  Status = AmlSerializeDefinitionBlock (
+             RootNode,
+             &Table
+             );
+
+  Status = AcpiTable->InstallAcpiTable (
+                        AcpiTable,
+                        Table,
+                        Table->Length,
+                        &TableHandle
+                        );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to install SSDT table\n"));
+  }
+
+  return EFI_SUCCESS;
+}
+
 
 EFI_STATUS
 EFIAPI
@@ -894,6 +945,12 @@ InitializeSbsaQemuAcpiDxe (
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "Failed to handle XHCI enablement\n"));
   }
+
+  Status = AddSsdtPcieTable (AcpiTable);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to add SSDT table\n"));
+  }
+
 
   return EFI_SUCCESS;
 }
