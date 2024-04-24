@@ -37,17 +37,6 @@ HardwareInfoLib|Include/Library/HardwareInfoLib.h
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPlatformXhciBase|0|UINT64|0x00000003
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPlatformXhciSize|0x10000|UINT32|0x00000004
 
-  # PCDs complementing PCIe layout pulled into ACPI tables
-  # Limit = Base + Size - 1
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciIoLimit|0x0000ffff|UINT32|0x00000006
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio32Limit|0xEFFFFFFF|UINT32|0x00000007
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio64Limit|0xFFFFFFFFFF|UINT64|0x00000008
-
-  # PCDs complementing gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress
-  # BarLimit = BaseAddress + BarSize - 1
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarSize|0x10000000|UINT64|0x00000009
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarLimit|0xFFFFFFFF|UINT64|0x00000010
-
 [PcdsDynamic.common]
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdCoreCount|0x1|UINT32|0x00000100
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdClusterCount|0x1|UINT32|0x00000101
@@ -75,3 +64,14 @@ HardwareInfoLib|Include/Library/HardwareInfoLib.h
   # ARM Generic Interrupt Controller ITS
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdGicItsBase|0|UINT64|0x00000120
   gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdSmmuBase|0|UINT64|0x00000121
+
+  # PCDs complementing PCIe layout pulled into ACPI tables
+  # Limit = Base + Size - 1
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio64Limit|0xFFFFFFFFFF|UINT64|0x00000008
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciIoLimit|0x0000ffff|UINT32|0x00000006
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio32Limit|0xEFFFFFFF|UINT32|0x00000007
+
+  # PCDs complementing gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress
+  # BarLimit = BaseAddress + BarSize - 1
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarSize|0x10000000|UINT64|0x00000009
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarLimit|0xFFFFFFFF|UINT64|0x00000010

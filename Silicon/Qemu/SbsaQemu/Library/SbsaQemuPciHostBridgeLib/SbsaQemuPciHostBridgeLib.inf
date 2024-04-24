@@ -33,7 +33,7 @@
 [LibraryClasses]
   DebugLib
 
-[FixedPcd]
+[Pcd]
   gArmTokenSpaceGuid.PcdPciBusMin
   gArmTokenSpaceGuid.PcdPciBusMax
   gArmTokenSpaceGuid.PcdPciIoBase

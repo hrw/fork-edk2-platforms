@@ -450,35 +450,10 @@ DEFINE NETWORK_HTTP_BOOT_ENABLE       = FALSE
   # point only, for entry point versions >= 3.0.
   gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosEntryPointProvideMethod|0x2
 
-  #
-  # PLDA PCI Root Complex
-  #
-  # ECAM size == 0x10000000
-  gArmTokenSpaceGuid.PcdPciBusMin|0
-  gArmTokenSpaceGuid.PcdPciBusMax|255
-  gArmTokenSpaceGuid.PcdPciIoBase|0x0
-  gArmTokenSpaceGuid.PcdPciIoSize|0x00010000
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciIoLimit|0x0000ffff
-  gArmTokenSpaceGuid.PcdPciMmio32Base|0x80000000
-  gArmTokenSpaceGuid.PcdPciMmio32Size|0x70000000
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio32Limit|0xEFFFFFFF
-  gArmTokenSpaceGuid.PcdPciMmio64Base|0x100000000
-  gArmTokenSpaceGuid.PcdPciMmio64Size|0xFF00000000
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio64Limit|0xFFFFFFFFFF
-
   # set PcdPciExpressBaseAddress to MAX_UINT64, which signifies that this
   # PCD and PcdPciDisableBusEnumeration have not been assigned yet
   # TODO: PcdPciExpressBaseAddress set to max_uint64
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xf0000000
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarSize|0x10000000
-  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarLimit|0xFFFFFFFF
-
-  gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation|0x7fff0000
-  gEfiMdePkgTokenSpaceGuid.PcdPciMmio32Translation|0x0
-  gEfiMdePkgTokenSpaceGuid.PcdPciMmio64Translation|0x0
-  ## If TRUE, OvmfPkg/AcpiPlatformDxe will not wait for PCI
-  #  enumeration to complete before installing ACPI tables.
-  gEfiMdeModulePkgTokenSpaceGuid.PcdPciDisableBusEnumeration|FALSE
 
   gArmTokenSpaceGuid.PcdSystemProductName|L"QEMU SBSA-REF Machine"
   gArmTokenSpaceGuid.PcdSystemVersion|L"1.0"
@@ -498,6 +473,34 @@ DEFINE NETWORK_HTTP_BOOT_ENABLE       = FALSE
   gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString|L"1.0"
 
 [PcdsDynamicDefault.common]
+
+  #
+  # PLDA PCI Root Complex
+  #
+  # ECAM size == 0x10000000
+  gArmTokenSpaceGuid.PcdPciMmio64Base|0x100000000
+  gArmTokenSpaceGuid.PcdPciMmio64Size|0xFF00000000
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio64Limit|0xFFFFFFFFFF
+  gArmTokenSpaceGuid.PcdPciBusMin|0
+  gArmTokenSpaceGuid.PcdPciBusMax|255
+  gArmTokenSpaceGuid.PcdPciIoBase|0x0
+  gArmTokenSpaceGuid.PcdPciIoSize|0x00010000
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciIoLimit|0x0000ffff
+  gArmTokenSpaceGuid.PcdPciMmio32Base|0x80000000
+  gArmTokenSpaceGuid.PcdPciMmio32Size|0x70000000
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciMmio32Limit|0xEFFFFFFF
+
+  gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation|0x7fff0000
+  gEfiMdePkgTokenSpaceGuid.PcdPciMmio32Translation|0x0
+  gEfiMdePkgTokenSpaceGuid.PcdPciMmio64Translation|0x0
+
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarSize|0x10000000
+  gArmVirtSbsaQemuPlatformTokenSpaceGuid.PcdPciExpressBarLimit|0xFFFFFFFF
+
+  ## If TRUE, OvmfPkg/AcpiPlatformDxe will not wait for PCI
+  #  enumeration to complete before installing ACPI tables.
+  gEfiMdeModulePkgTokenSpaceGuid.PcdPciDisableBusEnumeration|FALSE
+
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|3
 
   # Core and Cluster Count
