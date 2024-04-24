@@ -7,6 +7,7 @@
 *
 **/
 #include <IndustryStandard/IoRemappingTable.h>
+#include <IndustryStandard/MemoryMappedConfigurationSpaceAccessTable.h>
 #include <IndustryStandard/SbsaQemuAcpi.h>
 #include <IndustryStandard/SbsaQemuPlatformVersion.h>
 
@@ -883,6 +884,83 @@ AddSsdtPcieTable (
   return EFI_SUCCESS;
 }
 
+/** Adds the MCFG ACPI table.
+
+  @param AcpiTable        The ACPI Table.
+  @param PcieCfgData      PCIe configuration data.
+  @param NumPcieSegments  Number of PCIe segments.
+
+  @return EFI_SUCCESS on success, or an error code.
+
+**/
+STATIC
+EFI_STATUS
+AddMcfgTable (
+  IN EFI_ACPI_TABLE_PROTOCOL  *AcpiTable
+  )
+{
+  EFI_STATUS            Status;
+  UINTN                 TableHandle;
+  UINT32                TableSize;
+  EFI_PHYSICAL_ADDRESS  PageAddress;
+  UINT8                 *New;
+
+  EFI_ACPI_DESCRIPTION_HEADER  Header =
+    SBSAQEMU_ACPI_HEADER (
+      EFI_ACPI_6_3_PCI_EXPRESS_MEMORY_MAPPED_CONFIGURATION_SPACE_BASE_ADDRESS_DESCRIPTION_TABLE_SIGNATURE,
+      EFI_ACPI_DESCRIPTION_HEADER,
+      EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_SPACE_ACCESS_TABLE_REVISION
+      );
+
+  TableSize = sizeof (EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_BASE_ADDRESS_TABLE_HEADER) +
+              sizeof (EFI_ACPI_MEMORY_MAPPED_ENHANCED_CONFIGURATION_SPACE_BASE_ADDRESS_ALLOCATION_STRUCTURE);
+
+  Status = gBS->AllocatePages (
+                  AllocateAnyPages,
+                  EfiACPIReclaimMemory,
+                  EFI_SIZE_TO_PAGES (TableSize),
+                  &PageAddress
+                  );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to allocate pages for MCFG table\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  New = (UINT8 *)(UINTN)PageAddress;
+  ZeroMem (New, TableSize);
+
+  // Add the  ACPI Description table header
+  CopyMem (New, &Header, sizeof (EFI_ACPI_DESCRIPTION_HEADER));
+  ((EFI_ACPI_DESCRIPTION_HEADER *)New)->Length = TableSize;
+  New                                         += sizeof (EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_BASE_ADDRESS_TABLE_HEADER);
+
+  EFI_ACPI_MEMORY_MAPPED_ENHANCED_CONFIGURATION_SPACE_BASE_ADDRESS_ALLOCATION_STRUCTURE  *CfgPtr;
+
+  CfgPtr = (VOID *)New;
+
+  CfgPtr->BaseAddress           = PcdGet64 (PcdPciExpressBaseAddress);
+  CfgPtr->PciSegmentGroupNumber = 0;
+  CfgPtr->StartBusNumber        = PcdGet32 (PcdPciBusMin);
+  CfgPtr->EndBusNumber          = PcdGet32 (PcdPciBusMax);
+
+  New += sizeof (EFI_ACPI_MEMORY_MAPPED_ENHANCED_CONFIGURATION_SPACE_BASE_ADDRESS_ALLOCATION_STRUCTURE);
+
+  // Perform Checksum
+  AcpiTableChecksum ((UINT8 *)PageAddress, TableSize);
+
+  Status = AcpiTable->InstallAcpiTable (
+                        AcpiTable,
+                        (EFI_ACPI_COMMON_HEADER *)PageAddress,
+                        TableSize,
+                        &TableHandle
+                        );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to install MCFG table\n"));
+  }
+
+  return Status;
+}
+
 
 EFI_STATUS
 EFIAPI
@@ -949,6 +1027,11 @@ InitializeSbsaQemuAcpiDxe (
   Status = AddSsdtPcieTable (AcpiTable);
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "Failed to add SSDT table\n"));
+  }
+
+  Status = AddMcfgTable (AcpiTable);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "Failed to add MCFG table\n"));
   }
 
 
