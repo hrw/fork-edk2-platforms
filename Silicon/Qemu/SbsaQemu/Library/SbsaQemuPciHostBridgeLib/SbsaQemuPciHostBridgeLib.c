@@ -6,10 +6,14 @@
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
+#include <limits.h>
+#include <IndustryStandard/Pci.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PciHostBridgeLib.h>
+#include <Library/PciLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 
 #include <PiDxe.h>
@@ -52,76 +56,49 @@ CHAR16 *mPciHostBridgeLibAcpiAddressSpaceTypeStr[] = {
   L"Mem", L"I/O", L"Bus"
 };
 
-STATIC PCI_ROOT_BRIDGE mRootBridge = {
-  /* UINT32 Segment; Segment number */
-  0,
+EFI_STATUS
+EFIAPI
+PciHostBridgeUtilityInitRootBridge (
+  IN UINTN             RootBusNumber,
+  OUT PCI_ROOT_BRIDGE  *RootBus
+  )
+{
+  EFI_PCI_ROOT_BRIDGE_DEVICE_PATH  *DevicePath;
+  UINTN                            MaxSubBusNumber = 255;
 
-  /* UINT64 Supports; Supported attributes */
-  EFI_PCI_ATTRIBUTE_ISA_IO_16 | EFI_PCI_ATTRIBUTE_ISA_MOTHERBOARD_IO |
-  EFI_PCI_ATTRIBUTE_VGA_IO_16 | EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO_16,
+  DevicePath = AllocateCopyPool (
+                 sizeof mEfiPciRootBridgeDevicePath,
+                 &mEfiPciRootBridgeDevicePath
+                 );
+  if (DevicePath == NULL) {
+    DEBUG ((DEBUG_ERROR, "%a: %r\n", __func__, EFI_OUT_OF_RESOURCES));
+    return EFI_OUT_OF_RESOURCES;
+  }
 
-  /* UINT64 Attributes; Initial attributes */
-  EFI_PCI_ATTRIBUTE_ISA_IO_16 | EFI_PCI_ATTRIBUTE_ISA_MOTHERBOARD_IO |
-  EFI_PCI_ATTRIBUTE_VGA_IO_16 | EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO_16,
+  DevicePath->AcpiDevicePath.UID = RootBusNumber;
 
-  /* BOOLEAN DmaAbove4G; DMA above 4GB memory */
-  TRUE,
+  RootBus->Segment               = 0;
+  RootBus->Supports              = 0;
+  RootBus->Attributes            = 0;
+  RootBus->DmaAbove4G            = TRUE;
+  RootBus->AllocationAttributes  = EFI_PCI_HOST_BRIDGE_COMBINE_MEM_PMEM | EFI_PCI_HOST_BRIDGE_MEM64_DECODE, /* as Mmio64Size > 0 */
+  RootBus->Bus.Base              = RootBusNumber;
+  RootBus->Bus.Limit             = MaxSubBusNumber;
+  RootBus->Io.Base               = PcdGet64 (PcdPciIoBase);
+  RootBus->Io.Limit              = PcdGet64 (PcdPciIoBase) + PcdGet64 (PcdPciIoSize) - 1;
+  RootBus->Mem.Base              = PcdGet32 (PcdPciMmio32Base);
+  RootBus->Mem.Limit             = PcdGet32 (PcdPciMmio32Base) + PcdGet32 (PcdPciMmio32Size) - 1;
+  RootBus->MemAbove4G.Base       = PcdGet64 (PcdPciMmio64Base);
+  RootBus->MemAbove4G.Limit      = PcdGet64 (PcdPciMmio64Base) + PcdGet64 (PcdPciMmio64Size) - 1;
+  RootBus->PMem.Base             = MAX_UINT64;
+  RootBus->PMem.Limit            = 0;
+  RootBus->PMemAbove4G.Base      = MAX_UINT64;
+  RootBus->PMemAbove4G.Limit     = 0;
+  RootBus->NoExtendedConfigSpace = FALSE;
+  RootBus->DevicePath            = (EFI_DEVICE_PATH_PROTOCOL *)DevicePath;
 
-  /* BOOLEAN NoExtendedConfigSpace; When FALSE, the root bridge supports
-     Extended (4096-byte) Configuration Space.  When TRUE, the root bridge
-     supports 256-byte Configuration Space only. */
-  FALSE,
-
-  /* BOOLEAN ResourceAssigned; Resource assignment status of the root bridge.
-     Set to TRUE if Bus/IO/MMIO resources for root bridge have been assigned */
-  FALSE,
-
-  /* UINT64 AllocationAttributes; Allocation attributes. */
-  EFI_PCI_HOST_BRIDGE_COMBINE_MEM_PMEM |
-  EFI_PCI_HOST_BRIDGE_MEM64_DECODE, /* as Mmio64Size > 0 */
-
-  {
-     /* PCI_ROOT_BRIDGE_APERTURE Bus; Bus aperture which can be used by the
-      * root bridge. */
-     FixedPcdGet32 (PcdPciBusMin),
-     FixedPcdGet32 (PcdPciBusMax)
-  },
-
-  /* PCI_ROOT_BRIDGE_APERTURE Io; IO aperture which can be used by the root
-     bridge */
-  {
-     FixedPcdGet64 (PcdPciIoBase),
-     FixedPcdGet64 (PcdPciIoBase) + FixedPcdGet64 (PcdPciIoSize) - 1
-  },
-
-  /* PCI_ROOT_BRIDGE_APERTURE Mem; MMIO aperture below 4GB which can be used by
-     the root bridge
-     (gEfiMdePkgTokenSpaceGuid.PcdPciMmio32Translation as 0x0) */
-  {
-    FixedPcdGet32 (PcdPciMmio32Base),
-    FixedPcdGet32 (PcdPciMmio32Base) + FixedPcdGet32 (PcdPciMmio32Size) - 1,
-  },
-
-  /* PCI_ROOT_BRIDGE_APERTURE MemAbove4G; MMIO aperture above 4GB which can be
-     used by the root bridge.
-     (gEfiMdePkgTokenSpaceGuid.PcdPciMmio64Translation as 0x0) */
-  {
-    FixedPcdGet64 (PcdPciMmio64Base),
-    FixedPcdGet64 (PcdPciMmio64Base) + FixedPcdGet64 (PcdPciMmio64Size) - 1
-  },
-
-  /* PCI_ROOT_BRIDGE_APERTURE PMem; Prefetchable MMIO aperture below 4GB which
-     can be used by the root bridge.
-     In our case, there are no separate ranges for prefetchable and
-     non-prefetchable BARs */
-  { MAX_UINT64, 0 },
-
-  /* PCI_ROOT_BRIDGE_APERTURE PMemAbove4G; Prefetchable MMIO aperture above 4GB
-     which can be used by the root bridge. */
-  { MAX_UINT64, 0 },
-  /* EFI_DEVICE_PATH_PROTOCOL *DevicePath; Device path. */
-  (EFI_DEVICE_PATH_PROTOCOL *)&mEfiPciRootBridgeDevicePath,
-};
+  return EFI_SUCCESS;
+}
 
 /**
   Return all the root bridge instances in an array.
@@ -135,11 +112,67 @@ STATIC PCI_ROOT_BRIDGE mRootBridge = {
 PCI_ROOT_BRIDGE *
 EFIAPI
 PciHostBridgeGetRootBridges (
-  UINTN *Count
+  UINTN  *Count
   )
 {
-  *Count = 1;
-  return &mRootBridge;
+  PCI_ROOT_BRIDGE  *Bridges;
+  int              BusId, BusMin = 0, BusMax = 255, Index = 0;
+  int              AvailableBusses[255] = { INT_MAX }; // INT_MAX as "there is no bus"
+
+  *Count = 0;
+
+  //
+  // Scan all root buses. If function 0 of any device on a bus returns a
+  // VendorId register value different from all-bits-one, then that bus is
+  // alive.
+  //
+  for (BusId = BusMin; BusId <= BusMax; ++BusId) {
+    UINTN  Device;
+
+    for (Device = 0; Device <= PCI_MAX_DEVICE; ++Device) {
+      if (PciRead16 (
+            PCI_LIB_ADDRESS (
+              BusId,
+              Device,
+              0,
+              PCI_VENDOR_ID_OFFSET
+              )
+            ) != MAX_UINT16)
+      {
+        break;
+      }
+    }
+
+    if (Device <= PCI_MAX_DEVICE) {
+      DEBUG ((DEBUG_ERROR, "%a: found bus: 0x%02x\n", __func__, BusId));
+      AvailableBusses[Index++] = BusId;
+      *Count                  += 1;
+    }
+  }
+
+  //
+  // Allocate the "main" root bridge, and any extra root bridges.
+  //
+  Bridges = AllocateZeroPool (*Count * sizeof *Bridges);
+  if (Bridges == NULL) {
+    DEBUG ((DEBUG_ERROR, "%a: %r\n", __func__, EFI_OUT_OF_RESOURCES));
+    return NULL;
+  }
+
+  for (Index = 0; Index < *Count; Index++) {
+    if (AvailableBusses[Index] == INT_MAX) {
+      break;
+    }
+
+    PciHostBridgeUtilityInitRootBridge (AvailableBusses[Index], &Bridges[Index]);
+
+    // limit previous RootBridge bus range
+    if (Index > 0) {
+      Bridges[Index - 1].Bus.Limit = AvailableBusses[Index] - 1;
+    }
+  }
+
+  return Bridges;
 }
 
 /**
@@ -152,11 +185,11 @@ PciHostBridgeGetRootBridges (
 VOID
 EFIAPI
 PciHostBridgeFreeRootBridges (
-  PCI_ROOT_BRIDGE *Bridges,
-  UINTN           Count
+  PCI_ROOT_BRIDGE  *Bridges,
+  UINTN            Count
   )
 {
-  ASSERT (Count == 1);
+  FreePool (Bridges);
 }
 
 /**
