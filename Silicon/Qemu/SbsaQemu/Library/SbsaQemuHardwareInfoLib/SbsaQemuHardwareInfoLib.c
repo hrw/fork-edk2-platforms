@@ -181,3 +181,39 @@ GetNumaNodeCount (
 
   return NumberNumaNodes;
 }
+
+/**
+  Get CPU topology.
+**/
+VOID
+GetCpuTopology (
+  OUT CpuTopology  *CpuTopo
+  )
+{
+  UINTN   SmcResult;
+  UINTN   Arg0;
+  UINTN   Arg1;
+  UINTN   Arg2;
+  UINT32  NumCores = GetCpuCount ();
+
+  SmcResult = ArmCallSmc0 (SIP_SVC_GET_CPU_TOPOLOGY, &Arg0, &Arg1, &Arg2);
+  if (SmcResult != SMC_SIP_CALL_SUCCESS) {
+    DEBUG ((DEBUG_ERROR, "%a: SIP_SVC_GET_CPU_TOPOLOGY call failed. We have no cpu topology information.\n", __FUNCTION__));
+    ResetShutdown ();
+  } else {
+    CpuTopo->Sockets  = Arg0;
+    CpuTopo->Clusters = Arg1;
+    CpuTopo->Cores    = Arg2;
+    CpuTopo->Threads  = NumCores / (CpuTopo->Sockets * CpuTopo->Clusters * CpuTopo->Cores);
+  }
+
+  DEBUG ((
+    DEBUG_INFO,
+    "%a: CPU Topology: sockets are %d, clusters are %d, cores are %d, threads are %d\n",
+    __FUNCTION__,
+    CpuTopo->Sockets,
+    CpuTopo->Clusters,
+    CpuTopo->Cores,
+    CpuTopo->Threads
+    ));
+}
