@@ -31,6 +31,9 @@ static UINTN  GicItsBase;
 
 #pragma pack ()
 
+static UINTN  mCpuId;
+static UINTN  mCacheId;
+
 /*
  * A Function to Compute the ACPI Table Checksum
  */
@@ -491,44 +494,23 @@ AddSsdtTable (
   return Status;
 }
 
-/*
- * A function that adds the PPTT ACPI table.
- */
-EFI_STATUS
-AddPpttTable (
-  IN EFI_ACPI_TABLE_PROTOCOL  *AcpiTable
+STATIC
+UINT32
+AddCoresToPpttTable (
+  UINT8        *New,
+  UINT32       ClusterOffset,
+  CpuTopology  CpuTopo
   )
 {
-  EFI_STATUS            Status;
-  UINTN                 TableHandle;
-  UINT32                TableSize;
-  EFI_PHYSICAL_ADDRESS  PageAddress;
-  UINT8                 *New;
-  UINT32                CpuId;
-  CpuTopology           CpuTopo;
-  UINT32                CacheId;
-
-  GetCpuTopology (&CpuTopo);
-
-  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L1DCache = SBSAQEMU_ACPI_PPTT_L1_D_CACHE_STRUCT;
-  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L1ICache = SBSAQEMU_ACPI_PPTT_L1_I_CACHE_STRUCT;
-  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L2Cache  = SBSAQEMU_ACPI_PPTT_L2_CACHE_STRUCT;
-
-  EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR_FLAGS  SocketFlags = {
-    EFI_ACPI_6_5_PPTT_PACKAGE_PHYSICAL,
-    EFI_ACPI_6_5_PPTT_PROCESSOR_ID_INVALID,
-    EFI_ACPI_6_5_PPTT_PROCESSOR_IS_NOT_THREAD,
-    EFI_ACPI_6_5_PPTT_NODE_IS_NOT_LEAF,
-    EFI_ACPI_6_5_PPTT_IMPLEMENTATION_IDENTICAL
-  };
-
-  EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR_FLAGS  ClusterFlags = {
-    EFI_ACPI_6_5_PPTT_PACKAGE_NOT_PHYSICAL,
-    EFI_ACPI_6_5_PPTT_PROCESSOR_ID_INVALID,
-    EFI_ACPI_6_5_PPTT_PROCESSOR_IS_NOT_THREAD,
-    EFI_ACPI_6_5_PPTT_NODE_IS_NOT_LEAF,
-    EFI_ACPI_6_5_PPTT_IMPLEMENTATION_IDENTICAL
-  };
+  UINT32  L1DCacheOffset;
+  UINT32  L1ICacheOffset;
+  UINT32  L2CacheOffset;
+  UINT32  CoreOffset;
+  UINT32  Offset;
+  UINT32  CoreCpuId;
+  UINT32  CoreNum;
+  UINT32  ThreadNum;
+  UINT32  *PrivateResourcePtr;
 
   EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR_FLAGS  CoreFlags = {
     EFI_ACPI_6_5_PPTT_PACKAGE_NOT_PHYSICAL,
@@ -549,6 +531,125 @@ AddPpttTable (
     EFI_ACPI_6_5_PPTT_PROCESSOR_ID_VALID,
     EFI_ACPI_6_5_PPTT_PROCESSOR_IS_THREAD,
     EFI_ACPI_6_5_PPTT_NODE_IS_LEAF,
+    EFI_ACPI_6_5_PPTT_IMPLEMENTATION_IDENTICAL
+  };
+
+  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L1DCache = SBSAQEMU_ACPI_PPTT_L1_D_CACHE_STRUCT;
+  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L1ICache = SBSAQEMU_ACPI_PPTT_L1_I_CACHE_STRUCT;
+  EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE  L2Cache  = SBSAQEMU_ACPI_PPTT_L2_CACHE_STRUCT;
+
+  CoreOffset = ClusterOffset + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+  Offset     = CoreOffset;
+
+  for (CoreNum = 0; CoreNum < CpuTopo.Cores; CoreNum++) {
+    if (CpuTopo.Threads == 1) {
+      CoreCpuId = mCpuId;
+    } else {
+      CoreCpuId = 0;
+    }
+
+    // space for Core + PrivateResourcePtr
+    Offset += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+    Offset += sizeof (UINT32) * 2;
+
+    L1DCacheOffset = Offset;
+    L1ICacheOffset = L1DCacheOffset + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
+    L2CacheOffset  = L1ICacheOffset + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
+
+    EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR  Core = SBSAQEMU_ACPI_PROCESSOR_HIERARCHY_NODE_STRUCTURE_INIT (
+                                                    CoreFlags,
+                                                    ClusterOffset,
+                                                    CoreCpuId,
+                                                    2
+                                                    );
+
+    CopyMem (New, &Core, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR));
+    New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+
+    PrivateResourcePtr    = (UINT32 *)New;
+    PrivateResourcePtr[0] = L1DCacheOffset;
+    PrivateResourcePtr[1] = L1ICacheOffset;
+    New                  += (2 * sizeof (UINT32));
+
+    // Add L1 D Cache structure
+    L1DCache.CacheId = mCacheId++;
+    CopyMem (New, &L1DCache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
+    ((EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE *)New)->NextLevelOfCache = L2CacheOffset;
+    New                                                         += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
+
+    // Add L1 I Cache structure
+    L1ICache.CacheId = mCacheId++;
+    CopyMem (New, &L1ICache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
+    ((EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE *)New)->NextLevelOfCache = L2CacheOffset;
+    New                                                         += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
+
+    // Add L2 Cache structure
+    L2Cache.CacheId = mCacheId++;
+    CopyMem (New, &L2Cache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
+    New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
+
+    Offset += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE) * 3;
+
+    if (CpuTopo.Threads == 1) {
+      mCpuId++;
+    } else {
+      // Add the Thread PPTT structure
+      for (ThreadNum = 0; ThreadNum < CpuTopo.Threads; ThreadNum++) {
+        EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR  Thread = SBSAQEMU_ACPI_PROCESSOR_HIERARCHY_NODE_STRUCTURE_INIT (
+                                                          ThreadFlags,
+                                                          CoreOffset,
+                                                          mCpuId,
+                                                          0
+                                                          );
+        CopyMem (New, &Thread, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR));
+        New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+        mCpuId++;
+      }
+
+      Offset +=  CpuTopo.Threads * sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+    }
+
+    CoreOffset = Offset;
+  }
+
+  return CoreOffset - ClusterOffset - sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
+}
+
+/*
+ * A function that adds the PPTT ACPI table.
+ */
+EFI_STATUS
+AddPpttTable (
+  IN EFI_ACPI_TABLE_PROTOCOL  *AcpiTable
+  )
+{
+  EFI_STATUS            Status;
+  UINTN                 TableHandle;
+  UINT32                TableSize;
+  UINT32                CoresPartSize;
+  UINT32                SocketNum;
+  UINT32                ClusterNum;
+  UINT32                SocketOffset;
+  UINT32                ClusterOffset;
+  EFI_PHYSICAL_ADDRESS  PageAddress;
+  UINT8                 *New;
+  CpuTopology           CpuTopo;
+
+  GetCpuTopology (&CpuTopo);
+
+  EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR_FLAGS  SocketFlags = {
+    EFI_ACPI_6_5_PPTT_PACKAGE_PHYSICAL,
+    EFI_ACPI_6_5_PPTT_PROCESSOR_ID_INVALID,
+    EFI_ACPI_6_5_PPTT_PROCESSOR_IS_NOT_THREAD,
+    EFI_ACPI_6_5_PPTT_NODE_IS_NOT_LEAF,
+    EFI_ACPI_6_5_PPTT_IMPLEMENTATION_IDENTICAL
+  };
+
+  EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR_FLAGS  ClusterFlags = {
+    EFI_ACPI_6_5_PPTT_PACKAGE_NOT_PHYSICAL,
+    EFI_ACPI_6_5_PPTT_PROCESSOR_ID_INVALID,
+    EFI_ACPI_6_5_PPTT_PROCESSOR_IS_NOT_THREAD,
+    EFI_ACPI_6_5_PPTT_NODE_IS_NOT_LEAF,
     EFI_ACPI_6_5_PPTT_IMPLEMENTATION_IDENTICAL
   };
 
@@ -590,12 +691,9 @@ AddPpttTable (
   ((EFI_ACPI_DESCRIPTION_HEADER *)New)->Length = TableSize;
   New                                         += sizeof (EFI_ACPI_DESCRIPTION_HEADER);
 
-  UINT32  SocketNum, ClusterNum, CoreNum, ThreadNum;
-  UINT32  SocketOffset, ClusterOffset, CoreOffset, L1DCacheOffset, L1ICacheOffset, L2CacheOffset;
+  mCpuId   = 0;
+  mCacheId = 1;     // 0 is not a valid Cache ID.
 
-  CpuId       = 0;
-  SocketOffset = sizeof (EFI_ACPI_DESCRIPTION_HEADER);
-  CacheId     = 1; // 0 is not a valid Cache ID.
   SocketOffset = sizeof (EFI_ACPI_DESCRIPTION_HEADER);
   for (SocketNum = 0; SocketNum < CpuTopo.Sockets; SocketNum++) {
     // Add the Socket PPTT structure
@@ -610,8 +708,6 @@ AddPpttTable (
 
     ClusterOffset = SocketOffset + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
     for (ClusterNum = 0; ClusterNum < CpuTopo.Clusters; ClusterNum++) {
-      CoreIndex = ClusterIndex + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
-
       // Add the Cluster PPTT structure
       EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR  Cluster = SBSAQEMU_ACPI_PROCESSOR_HIERARCHY_NODE_STRUCTURE_INIT (
                                                          ClusterFlags,
@@ -622,74 +718,9 @@ AddPpttTable (
       CopyMem (New, &Cluster, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR));
       New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
 
-      for (CoreNum = 0; CoreNum < CpuTopo.Cores; CoreNum++) {
-        UINT32  *PrivateResourcePtr;
-        UINT32  CoreCpuId;
-
-        // two UINT32s for PrivateResourcePtr data
-        L1DCacheIndex = CoreIndex + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR) + sizeof (UINT32) * 2;
-        L1ICacheIndex = L1DCacheIndex + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
-        L2CacheIndex  = L1ICacheIndex + sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
-
-        if (CpuTopo.Threads == 1) {
-          CoreCpuId = CpuId;
-        } else {
-          CoreCpuId = 0;
-        }
-
-        EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR  Core = SBSAQEMU_ACPI_PROCESSOR_HIERARCHY_NODE_STRUCTURE_INIT (
-                                                        CoreFlags,
-                                                        ClusterOffset,
-                                                        CoreCpuId,
-                                                        2
-                                                        );
-        CopyMem (New, &Core, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR));
-        New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
-
-        PrivateResourcePtr    = (UINT32 *)New;
-        PrivateResourcePtr[0] = L1DCacheOffset;
-        PrivateResourcePtr[1] = L1ICacheOffset;
-        New                  += (2 * sizeof (UINT32));
-
-        // Add L1 D Cache structure
-        L1DCache.CacheId = CacheId++;
-        CopyMem (New, &L1DCache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
-        ((EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE *)New)->NextLevelOfCache = L2CacheIndex;
-        New                                                         += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
-
-        // Add L1 I Cache structure
-        L1ICache.CacheId = CacheId++;
-        CopyMem (New, &L1ICache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
-        ((EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE *)New)->NextLevelOfCache = L2CacheIndex;
-        New                                                         += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
-
-        // Add L2 Cache structure
-        L2Cache.CacheId = CacheId++;
-        CopyMem (New, &L2Cache, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE));
-        New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_CACHE);
-
-        if (CpuTopo.Threads == 1) {
-          CpuId++;
-        } else {
-          // Add the Thread PPTT structure
-          for (ThreadNum = 0; ThreadNum < CpuTopo.Threads; ThreadNum++) {
-            EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR  Thread = SBSAQEMU_ACPI_PROCESSOR_HIERARCHY_NODE_STRUCTURE_INIT (
-                                                              ThreadFlags,
-                                                              CoreOffset,
-                                                              CpuId,
-                                                              0
-                                                              );
-            CopyMem (New, &Thread, sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR));
-            New += sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
-            CpuId++;
-          }
-
-          CoreOffset +=  CpuTopo.Threads * sizeof (EFI_ACPI_6_5_PPTT_STRUCTURE_PROCESSOR);
-        }
-
-      }
-
-      ClusterOffset = CoreOffset;
+      CoresPartSize  = AddCoresToPpttTable (New, ClusterOffset, CpuTopo);
+      ClusterOffset += CoresPartSize;
+      New           += CoresPartSize;
     }
 
     SocketOffset = ClusterOffset;
