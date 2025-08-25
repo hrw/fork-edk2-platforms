@@ -1,5 +1,8 @@
-This branch holds all platforms actively maintained against the
-[edk2](https://github.com/tianocore/edk2) master branch.
+This branch holds platforms and drivers actively maintained against the
+[edk2](https://github.com/tianocore/edk2) default branch.
+If any platform or driver is failing to build against current edk2 and (if
+applicable) [edk2-non-osi](https://github.com/tianocore/edk2-non-osi), please
+raise a github issue.
 
 For generic information about the edk2-platforms repository, and the process
 under which _stable_ and _devel_ branches can be added for individual platforms,
@@ -21,7 +24,6 @@ are covered by additional licenses:
    * [Manual building](#manual-building)
    * [Using uefi-tools helper scripts](#using-uefi-tools-helper-scripts)
 * [How To Build (Windows Environment)](#how-to-build-windows-environment)
-* [Supported Platforms](#supported-platforms)
 * [Maintainers](#maintainers)
 
 # Overview
@@ -60,7 +62,7 @@ W: https://github.com/tianocore/tianocore.github.io/wiki/Security
 # How to build (Linux Environment)
 
 ## Prerequisites
-The build tools themselves depend on Python (2) and libuuid. Most Linux systems
+The build tools themselves depend on Python (3) and libuuid. Most Linux systems
 will come with a Python environment installed by default, but you usually need
 to install uuid-dev (or uuid-devel, depending on distribution) manually.
 
@@ -143,10 +145,6 @@ target-specific binutils. These are included with any prepackaged GCC toolchain
 
    `make -C edk2/BaseTools`
 
-   (BaseTools can currently not be built in parallel, so do not specify any `-j`
-   option, either on the command line or in a **MAKEFLAGS** environment
-   variable.)
-
 ### Build options
 There are a number of options that can (or must) be specified at the point of
 building. Their default values are set in `edk2/Conf/target.txt`. If we are
@@ -169,21 +167,11 @@ After a successful build, the resulting images can be found in
 `Build/{Platform Name}/{TARGET}_{TOOL_CHAIN_TAG}/FV`.
 
 ### Build a platform
-The main build process _can_ run in parallel - so figure out how many threads we
-have available.
-
+The main build process runs in parallel natively. For the toolchain tag, use
+GCC for gcc version 5 or later, GCC4x for earlier versions, or
+CLANGPDB/CLANGDWARF as appropriate when building with clang.
 ```
-$ getconf _NPROCESSORS_ONLN
-8
-```
-OK, so we have 8 CPUs - let's tell the build to use a little more than that:
-```
-$ NUM_CPUS=$((`getconf _NPROCESSORS_ONLN` + 2))
-```
-For the toolchain tag, use GCC5 for gcc version 5 or later, GCC4x for
-earlier versions, or CLANG35/CLANG38 as appropriate when building with clang.
-```
-$ build -n $NUM_CPUS -a AARCH64 -t GCC5 -p Platform/ARM/JunoPkg/ArmJuno.dsc
+$ build -a AARCH64 -t GCC -p Platform/ARM/JunoPkg/ArmJuno.dsc
 ```
 (Note that the description file gets resolved by the build command through
 searching in all locations specified in **PACKAGES_PATH**.)
@@ -193,9 +181,9 @@ When cross-compiling, or building with a different version of the compiler than
 the default `gcc` or `clang`(/binutils), we additionally need to inform the
 build command which toolchain to use. We do this by setting the environment
 variable `{TOOL_CHAIN_TAG}_{TARGET_ARCH}_PREFIX` - in the case above,
-**GCC5_AARCH64_PREFIX**.
+**GCC_AARCH64_PREFIX**.
 
-So, referring to the cross compiler toolchain table above, we should prepend the `build` command line with `GCC5_AARCH64_PREFIX=aarch64-linux-gnu-`.
+So, referring to the cross compiler toolchain table above, we should prepend the `build` command line with `GCC_AARCH64_PREFIX=aarch64-linux-gnu-`.
 
 ## Using uefi-tools helper scripts
 uefi-tools is a completely unofficial set of helper-scripts developed by Linaro.
@@ -234,83 +222,6 @@ $ ./uefi-tools/edk2-build.sh -b DEBUG -b RELEASE
 
 (I genuinely have no idea. Please help!)
 
-
-# Supported Platforms
-
-These are the platforms currently supported by this tree - grouped by
-Processor/SoC vendor, rather than platform vendor.
-
-If there are any additional build steps beyond the generic ones listed above,
-they will be documented with the platform.
-
-## AMD
-* [Cello](Platform/LeMaker/CelloBoard)
-* [Overdrive](Platform/AMD/OverdriveBoard)
-* [Overdrive 1000](Platform/SoftIron/Overdrive1000Board)
-
-## [Ampere](Platform/Ampere/Readme.md)
-* [Mt. Jade](Platform/Ampere/JadePkg)
-
-## [ARM](Platform/ARM/Readme.md)
-* [Juno](Platform/ARM/JunoPkg)
-* [SGI family](Platform/ARM/SgiPkg)
-
-## BeagleBoard
-* [BeagleBoard](Platform/BeagleBoard/BeagleBoardPkg)
-
-## Hisilicon
-* [D03](Platform/Hisilicon/D03)
-* [D05](Platform/Hisilicon/D05)
-* [D06](Platform/Hisilicon/D06)
-* [HiKey](Platform/Hisilicon/HiKey)
-* [HiKey960](Platform/Hisilicon/HiKey960)
-
-## Intel
-### [Minimum Platforms](Platform/Intel/Readme.md)
-* [Kaby Lake](Platform/Intel/KabylakeOpenBoardPkg)
-* [Purley](Platform/Intel/PurleyOpenBoardPkg)
-* [Simics](Platform/Intel/SimicsOpenBoardPkg)
-* [Whiskey Lake](Platform/Intel/WhiskeylakeOpenBoardPkg)
-* [Comet Lake](Platform/Intel/CometlakeOpenBoardPkg)
-* [Tiger Lake](Platform/Intel/TigerlakeOpenBoardPkg)
-* [Whitley/Cedar Island](Platform/Intel/WhitleyOpenBoardPkg)
-* [Alder Lake](Platform/Intel/AlderlakeOpenBoardPkg)
-
-For more information, see the
-[EDK II Minimum Platform Specification](https://edk2-docs.gitbooks.io/edk-ii-minimum-platform-specification).
-### Other Platforms
-##### Intel&reg; Quark SoC X1000 based platforms
-* [Galileo](Platform/Intel/QuarkPlatformPkg)
-##### Minnowboard Max/Turbot based on Intel Valleyview2 SoC
-* [Minnowboard Max](Platform/Intel/Vlv2TbltDevicePkg)
-
-## Loongson
-* [LoongArchQemu](Platform/Loongson/LoongArchQemuPkg)
-
-## Marvell
-* [Armada 70x0](Platform/Marvell/Armada70x0Db)
-* [Armada 80x0](Platform/Marvell/Armada80x0Db)
-* [CN913x](Platform/Marvell/Cn913xDb)
-* [SolidRun Armada MacchiatoBin](Platform/SolidRun/Armada80x0McBin)
-
-## Raspberry Pi
-* [Pi 3](Platform/RaspberryPi/RPi3)
-* [Pi 4](Platform/RaspberryPi/RPi4)
-
-## RISC-V
-### SiFive
-* [Sifive U5 Series](Platform/SiFive/U5SeriesPkg) Refer to Platform/SiFive/U5Series/Readme.md on edk2-platform repository.
-* [Freedom U500 VC707 FPGA](Platform/SiFive/U5SeriesPkg/FreedomU500VC707Board)
-* [Freedom U540 HiFive Unleashed](Platform/SiFive/U5SeriesPkg/FreedomU540HiFiveUnleashedBoard)
-
-## Socionext
-* [SynQuacer](Platform/Socionext/DeveloperBox)
-
-## NXP
-* [LS1043aRdb](Platform/NXP/LS1043aRdbPkg)
-
-## Qemu
-* [SBSA](Platform/Qemu/SbsaQemu)
 
 # Maintainers
 

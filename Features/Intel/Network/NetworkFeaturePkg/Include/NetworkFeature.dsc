@@ -32,8 +32,11 @@
 # PCD Section - list of EDK II PCD Entries modified by the feature.
 #
 ################################################################################
-[PcdsFixedAtBuild]
-  !include NetworkPkg/NetworkPcds.dsc.inc
+[PcdsFixedAtBuild.$(DXE_ARCH)]
+  !include NetworkPkg/NetworkFixedPcds.dsc.inc
+
+[PcdsDynamicDefault.$(DXE_ARCH)]
+  !include NetworkPkg/NetworkDynamicPcds.dsc.inc
 
 ################################################################################
 #
@@ -63,10 +66,7 @@
 #
 # Feature DXE Components
 #
-
-# @todo: Change below line to [Components.$(DXE_ARCH)] after https://bugzilla.tianocore.org/show_bug.cgi?id=2308
-#        is completed.
-[Components.X64]
+[Components.$(DXE_ARCH)]
   #####################################
   # Network Feature Package
   #####################################

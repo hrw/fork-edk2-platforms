@@ -57,6 +57,7 @@
   DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
   UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
   UefiRuntimeLib|MdePkg/Library/UefiRuntimeLib/UefiRuntimeLib.inf
+  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
 
 ################################################################################
 #
@@ -103,6 +104,10 @@
   OptionRomPkg/CirrusLogic5430Dxe/CirrusLogic5430Dxe.inf
   OptionRomPkg/UndiRuntimeDxe/UndiRuntimeDxe.inf
   OptionRomPkg/Bus/Usb/FtdiUsbSerialDxe/FtdiUsbSerialDxe.inf
+  OptionRomPkg/RenesasFirmwarePD720202/RenesasFirmwarePD720202.inf {
+    <LibraryClasses>
+      DxeServicesLib|MdePkg/Library/DxeServicesLib/DxeServicesLib.inf
+  }
 
 [Components.IA32, Components.X64]
   OptionRomPkg/Application/BltLibSample/BltLibSample.inf

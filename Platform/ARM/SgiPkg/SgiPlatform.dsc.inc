@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2018 - 2024, Arm Limited. All rights reserved.
+#  Copyright (c) 2018 - 2025, Arm Limited. All rights reserved.
 #  (C) Copyright 2021 Hewlett Packard Enterprise Development LP<BR>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -23,12 +23,15 @@
   DEFINE CPPC_EN                            = FALSE
 
 [BuildOptions]
-  *_*_*_CC_FLAGS = -D DISABLE_NEW_DEPRECATED_INTERFACES
+  # EDK2_PLAT_FW_REL_VERSION macro resolve to value like RD-INFRA-2024.09.30.
+  # This value is set in build-uefi.sh
+  *_*_*_CC_FLAGS = -DDISABLE_NEW_DEPRECATED_INTERFACES -DEDK2_PLAT_FW_REL_VERSION=\"$(EDK2_PLAT_FW_REL_VERSION)\"
 
 [LibraryClasses.common]
   ArmLib|ArmPkg/Library/ArmLib/ArmBaseLib.inf
-  ArmMmuLib|ArmPkg/Library/ArmMmuLib/ArmMmuBaseLib.inf
-  ArmSmcLib|ArmPkg/Library/ArmSmcLib/ArmSmcLib.inf
+  ArmMmuLib|UefiCpuPkg/Library/ArmMmuLib/ArmMmuBaseLib.inf
+  ArmSmcLib|MdePkg/Library/ArmSmcLib/ArmSmcLib.inf
+  ArmSvcLib|MdePkg/Library/ArmSvcLib/ArmSvcLib.inf
   ArmPlatformSysConfigLib|Platform/ARM/VExpressPkg/Library/ArmVExpressSysConfigLib/ArmVExpressSysConfigLib.inf
   ArmPlatformLib|Platform/ARM/SgiPkg/Library/PlatformLib/PlatformLib.inf
   BasePathLib|ShellPkg/Library/UefiShellLib/UefiShellLib.inf
@@ -57,9 +60,6 @@
   PeiServicesLib|MdePkg/Library/PeiServicesLib/PeiServicesLib.inf
   PeiServicesTablePointerLib|ArmPkg/Library/PeiServicesTablePointerLib/PeiServicesTablePointerLib.inf
 
-  # ARM platforms have SEC modules with standard entry points, so we can generically link StackCheckLib
-  NULL|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
-
 [LibraryClasses.common.PEI_CORE, LibraryClasses.common.PEIM]
   BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
   HobLib|MdePkg/Library/PeiHobLib/PeiHobLib.inf
@@ -73,6 +73,7 @@
   PeiCoreEntryPoint|MdePkg/Library/PeiCoreEntryPoint/PeiCoreEntryPoint.inf
 
 [LibraryClasses.common.PEIM]
+  ArmFfaLib|MdeModulePkg/Library/ArmFfaLib/ArmFfaPeiLib.inf
   PeimEntryPoint|MdePkg/Library/PeimEntryPoint/PeimEntryPoint.inf
 
 [LibraryClasses.common.DXE_CORE]
@@ -83,13 +84,14 @@
   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
 
 [LibraryClasses.common.DXE_DRIVER]
-  FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
+  ArmFfaLib|MdeModulePkg/Library/ArmFfaLib/ArmFfaDxeLib.inf
   PciHostBridgeLib|Platform/ARM/SgiPkg/Library/PciHostBridgeLib/PciHostBridgeLib.inf
   PciSegmentLib|MdePkg/Library/BasePciSegmentLibPci/BasePciSegmentLibPci.inf
   PciLib|MdePkg/Library/BasePciLibPciExpress/BasePciLibPciExpress.inf
   PciExpressLib|MdePkg/Library/BasePciExpressLib/BasePciExpressLib.inf
 
 [LibraryClasses.common.DXE_RUNTIME_DRIVER]
+  ArmFfaLib|MdeModulePkg/Library/ArmFfaLib/ArmFfaDxeLib.inf
   BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
   HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
 !if $(TARGET) != RELEASE
@@ -97,6 +99,7 @@
 !endif
 
 [LibraryClasses.common.UEFI_DRIVER, LibraryClasses.common.UEFI_APPLICATION, LibraryClasses.common.DXE_RUNTIME_DRIVER, LibraryClasses.common.DXE_DRIVER]
+  ArmFfaLib|MdeModulePkg/Library/ArmFfaLib/ArmFfaDxeLib.inf
   PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
 
 ################################################################################
@@ -115,7 +118,6 @@
 !endif
 
 [PcdsFixedAtBuild.common]
-  gArmTokenSpaceGuid.PcdVFPEnabled|1
   gEfiMdeModulePkgTokenSpaceGuid.PcdMaxVariableSize|0x2000
 
   # DRAM Block2 Base and Size
@@ -190,8 +192,10 @@
   gArmSgiTokenSpaceGuid.PcdVirtioNetSize|0x10000
 
   # Counter, Timer and Watchdog
-  gArmSgiTokenSpaceGuid.PcdTimerBase0Base|0x2A830000
-  gArmSgiTokenSpaceGuid.PcdTimerBase0Size|0x00010000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame0Base|0x2A830000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame1Base|0x2A820000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame0Size|0x00010000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame1Size|0x00010000
   gArmSgiTokenSpaceGuid.PcdTimerControlBase|0x2A810000
   gArmSgiTokenSpaceGuid.PcdTimerControlSize|0x00010000
   gArmSgiTokenSpaceGuid.PcdTimerCounterReadBase|0x2A800000
@@ -208,7 +212,7 @@
   # size of this buffer from ATF, hard-code it here
   #
   ## MM Communicate
-  gArmTokenSpaceGuid.PcdMmBufferBase|0xFF600000
+  gArmTokenSpaceGuid.PcdMmBufferBase|0xFEF00000
   gArmTokenSpaceGuid.PcdMmBufferSize|0x10000
 
 ################################################################################
@@ -235,7 +239,10 @@
     <LibraryClasses>
       NULL|MdeModulePkg/Library/LzmaCustomDecompressLib/LzmaCustomDecompressLib.inf
   }
-  Platform/ARM/SgiPkg/Library/SgiPlatformPei/SgiPlatformPei.inf
+  Platform/ARM/SgiPkg/Library/SgiPlatformPei/SgiPlatformPei.inf {
+    <LibraryClasses>
+      FdtLib|MdePkg/Library/BaseFdtLib/BaseFdtLib.inf
+  }
 
   #
   # DXE
@@ -251,7 +258,7 @@
   # Architectural Protocols
   #
   ArmPkg/Drivers/CpuDxe/CpuDxe.inf
-  ArmPkg/Drivers/ArmGic/ArmGicDxe.inf
+  ArmPkg/Drivers/ArmGicDxe/ArmGicV3Dxe.inf
   ArmPkg/Drivers/TimerDxe/TimerDxe.inf
   ArmPkg/Drivers/GenericWatchdogDxe/GenericWatchdogDxe.inf
 !if $(ENABLE_GOP) == TRUE

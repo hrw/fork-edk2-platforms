@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2020 - 2024, Arm Limited. All rights reserved.
+#  Copyright (c) 2020 - 2025, Arm Limited. All rights reserved.
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -49,10 +49,15 @@
   gArmSgiTokenSpaceGuid.PcdMaxAddressBitsPerChip|42
 
   # Timer & Watchdog interrupts
-  gArmSgiTokenSpaceGuid.PcdGtFrame0Gsiv|92
-  gArmSgiTokenSpaceGuid.PcdGtFrame1Gsiv|91
+  gArmSgiTokenSpaceGuid.PcdTimerFrame0Gsiv|92
+  gArmSgiTokenSpaceGuid.PcdTimerFrame1Gsiv|91
   gArmSgiTokenSpaceGuid.PcdWdogWS0Gsiv|93
   gArmSgiTokenSpaceGuid.PcdWdogWS1Gsiv|94
+
+  # Generic Timer
+  gArmSgiTokenSpaceGuid.PcdTimerControlBase|0x2A810000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame0Base|0x2A830000
+  gArmSgiTokenSpaceGuid.PcdTimerFrame1Base|0x2A820000
 
   # SP804 dual timer
   gArmSgiTokenSpaceGuid.PcdSp804DualTimerBaseAddress|0x1C110000
@@ -68,8 +73,15 @@
   gArmSgiTokenSpaceGuid.PcdGpioController0Size|0x00010000
   gArmSgiTokenSpaceGuid.PcdGpioController0Interrupt|136
 
-  # System Memory (1GB - 16MB of Trusted DRAM at the top of the
-  # 32bit address space)
+  # System Memory (2GB - 16MB of Trusted DRAM at the top of the
+  # 32bit address space) and Normal shared area with
+  # Secure world is reserved 1MB from (2GB - 16MB).
+  # Therefore, set the default System Memory size to (2GB - 17MB)
   gArmTokenSpaceGuid.PcdSystemMemoryBase|0x80000000
-  gArmTokenSpaceGuid.PcdSystemMemorySize|0x7F000000
+  gArmTokenSpaceGuid.PcdSystemMemorySize|0x7EF00000
 
+  #Second DRAM Block Addresses
+  gArmSgiTokenSpaceGuid.PcdDramBlock2AddrChip0|0x08080000000
+  gArmSgiTokenSpaceGuid.PcdDramBlock2AddrChip1|0x48080000000
+  gArmSgiTokenSpaceGuid.PcdDramBlock2AddrChip2|0x88080000000
+  gArmSgiTokenSpaceGuid.PcdDramBlock2AddrChip3|0xC8080000000

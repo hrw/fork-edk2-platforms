@@ -1,7 +1,7 @@
 ## @file
 #  Configuration Manager Dxe
 #
-#  Copyright (c) 2017 - 2023, Arm Limited. All rights reserved.<BR>
+#  Copyright (c) 2017 - 2025, Arm Limited. All rights reserved.<BR>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
@@ -23,7 +23,6 @@
 [Sources]
   ConfigurationManager.c
   AslTables/Dsdt.asl
-  AslTables/SsdtPci.asl
 
 [Packages]
   ArmPkg/ArmPkg.dec
@@ -60,7 +59,6 @@
 
   # SBSA Generic Watchdog
   gArmTokenSpaceGuid.PcdGenericWatchdogControlBase
-  gArmTokenSpaceGuid.PcdGenericWatchdogEl2IntrNum
   gArmTokenSpaceGuid.PcdGenericWatchdogRefreshBase
 
   gArmTokenSpaceGuid.PcdGicDistributorBase
@@ -78,6 +76,7 @@
   gArmTokenSpaceGuid.PcdPciBusMax
 
 [Pcd]
+  gArmTokenSpaceGuid.PcdGenericWatchdogEl2IntrNum
 
 [Depex]
-  TRUE
+  gEfiTimerArchProtocolGuid

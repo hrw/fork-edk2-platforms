@@ -1,6 +1,6 @@
 ## @file
 #
-# Copyright (c) 2020 - 2023, Ampere Computing LLC. All rights reserved.<BR>
+# Copyright (c) 2020 - 2024, Ampere Computing LLC. All rights reserved.<BR>
 #
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -47,11 +47,20 @@
   #  DEBUG_VERBOSE   0x00400000  // Detailed debug messages that may
   #                              // significantly impact boot performance
   #  DEBUG_ERROR     0x80000000  // Error
-  DEFINE DEBUG_PRINT_ERROR_LEVEL = 0x8000000F
-  DEFINE FIRMWARE_VER            = 0.01.001
-  DEFINE SECURE_BOOT_ENABLE      = FALSE
+  !if $(TARGET) == RELEASE
+    DEFINE DEBUG_PRINT_ERROR_LEVEL = 0x80000002
+  !else
+    DEFINE DEBUG_PRINT_ERROR_LEVEL = 0x8000000F
+  !endif
+  DEFINE FIRMWARE_VER            = 00.01.01-01
+  DEFINE FIRMWARE_VER_HEX        = 0x00010100
+  DEFINE CAPSULE_ENABLE          = TRUE
+  DEFINE INCLUDE_TFA_FW          = TRUE
+  DEFINE UEFI_SECURE_BOOT_ENABLE = TRUE
+  DEFINE TPM2_ENABLE             = TRUE
+  DEFINE SHELL_ENABLE            = TRUE
   DEFINE INCLUDE_TFTP_COMMAND    = TRUE
-  DEFINE PLATFORM_CONFIG_UUID    = 84BC921F-9D4A-4D1D-A1A1-1AE13EDD07E5
+  DEFINE PLATFORM_CONFIG_UUID    = 0ce52880-9077-4d31-8d7a-91acef0a4e43
 
   #
   # Network definition
@@ -59,7 +68,14 @@
   DEFINE NETWORK_IP6_ENABLE                  = FALSE
   DEFINE NETWORK_HTTP_BOOT_ENABLE            = TRUE
   DEFINE NETWORK_ALLOW_HTTP_CONNECTIONS      = TRUE
-  DEFINE NETWORK_TLS_ENABLE                  = FALSE
+  DEFINE NETWORK_TLS_ENABLE                  = TRUE
+  DEFINE REDFISH_ENABLE                      = TRUE
+  DEFINE PERFORMANCE_MEASUREMENT_ENABLE      = FALSE
+
+!if $(CAPSULE_ENABLE) == TRUE
+  DEFINE UEFI_IMAGE                          = Build/Jade/jade_uefi.bin
+  DEFINE TFA_UEFI_IMAGE                      = BUild/Jade/jade_tfa_uefi.bin
+!endif
 
 !include MdePkg/MdeLibs.dsc.inc
 
@@ -87,6 +103,15 @@
   PlatformBmcReadyLib|Platform/Ampere/JadePkg/Library/PlatformBmcReadyLib/PlatformBmcReadyLib.inf
   IOExpanderLib|Platform/Ampere/JadePkg/Library/IOExpanderLib/IOExpanderLib.inf
 
+  #
+  # EFI Redfish drivers
+  #
+!if $(REDFISH_ENABLE) == TRUE
+  RedfishContentCodingLib|RedfishPkg/Library/RedfishContentCodingLibNull/RedfishContentCodingLibNull.inf
+  RedfishPlatformHostInterfaceLib|RedfishPkg/Library/PlatformHostInterfaceBmcUsbNicLib/PlatformHostInterfaceBmcUsbNicLib.inf
+  RedfishPlatformWantedDeviceLib|RedfishPkg/Library/RedfishPlatformWantedDeviceLibNull/RedfishPlatformWantedDeviceLibNull.inf
+!endif
+
 [LibraryClasses.common.DXE_RUNTIME_DRIVER]
   #
   # RTC Library: Common RTC
@@ -108,6 +133,8 @@
   # Flag to indicate option of using default or specific platform Port Map table
   #
   gAmpereTokenSpaceGuid.PcdPcieHotPlugPortMapTable.UseDefaultConfig|TRUE
+
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSupportUpdateCapsuleReset|TRUE
 
 [PcdsFixedAtBuild]
   gAmpereTokenSpaceGuid.PcdPcieHotPlugGpioResetMap|0x3F
@@ -171,6 +198,17 @@
   gAmpereTokenSpaceGuid.PcdPcieHotPlugPortMapTable.PortMap[35]|{ 35, 1, 7, 6, 0, 0x24, 0x70, 0x4, 0, 11, 8 }   # S1 RCB3.6 - SSD8
   gAmpereTokenSpaceGuid.PcdPcieHotPlugPortMapTable.PortMap[36]|{ 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF }       # Require if no fully structure used
 
+  # We should support CoD in future, since it provides a nicer
+  # upgrade experience (e.g. a progress bar).
+  gEfiMdeModulePkgTokenSpaceGuid.PcdCapsuleOnDiskSupport|FALSE
+
+!if $(UEFI_SECURE_BOOT_ENABLE) == TRUE
+  gEfiSecurityPkgTokenSpaceGuid.PcdRsa2048Sha256PublicKeyBuffer|{0}
+  !include Platform/Ampere/JadePkg/root.cer.gEfiSecurityPkgTokenSpaceGuid.PcdPkcs7CertBuffer.inc
+!endif
+
+  gAmpereTokenSpaceGuid.PcdFirmwareVersionNumber|$(FIRMWARE_VER_HEX)
+
 [PcdsFixedAtBuild.common]
   #
   # Platform config UUID
@@ -185,7 +223,7 @@
   # point only, for entry point versions >= 3.0.
   gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosEntryPointProvideMethod|0x2
 
-!if $(SECURE_BOOT_ENABLE) == TRUE
+!if $(UEFI_SECURE_BOOT_ENABLE) == TRUE
   # Override the default values from SecurityPkg to ensure images
   # from all sources are verified in secure boot
   gEfiSecurityPkgTokenSpaceGuid.PcdOptionRomImageVerificationPolicy|0x04
@@ -194,6 +232,11 @@
 !endif
 
 [PcdsDynamicDefault.common.DEFAULT]
+
+[PcdsDynamicExDefault.common.DEFAULT]
+  gEfiSignedCapsulePkgTokenSpaceGuid.PcdEdkiiSystemFirmwareImageDescriptor|{0x0}|VOID*|0x100
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSystemFmpCapsuleImageTypeIdGuid|{GUID("f08bca31-542e-4cea-8b48-8e54f9422594")}|VOID*|0x10
+  gEfiSignedCapsulePkgTokenSpaceGuid.PcdEdkiiSystemFirmwareFileGuid|{GUID("431c06ed-4fe2-438f-98a3-a9b1fd923019")}|VOID*|0x10
 
 [PcdsPatchableInModule]
   #
@@ -219,6 +262,9 @@
   Silicon/Ampere/AmpereAltraPkg/AcpiCommonTables/AcpiCommonTables.inf
   Platform/Ampere/JadePkg/AcpiTables/AcpiTables.inf
   Platform/Ampere/JadePkg/Ac02AcpiTables/Ac02AcpiTables.inf
+
+  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+  MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntimeDxe.inf
 
   #
   # PCIe
@@ -248,3 +294,54 @@
   Silicon/Ampere/AmpereAltraPkg/Drivers/AcpiConfigDxe/AcpiConfigDxe.inf
   Silicon/Ampere/AmpereAltraPkg/Drivers/RasConfigDxe/RasConfigDxe.inf
   Silicon/Ampere/AmpereSiliconPkg/Drivers/BmcConfigDxe/BmcConfigDxe.inf
+
+  #
+  # Firmware Capsule Update
+  #
+!if $(CAPSULE_ENABLE) == TRUE
+  Platform/Ampere/JadePkg/Capsule/SystemFirmwareDescriptor/SystemFirmwareDescriptor.inf
+  MdeModulePkg/Universal/EsrtDxe/EsrtDxe.inf
+  MdeModulePkg/Universal/EsrtFmpDxe/EsrtFmpDxe.inf
+  SignedCapsulePkg/Universal/SystemFirmwareUpdate/SystemFirmwareReportDxe.inf {
+    <LibraryClasses>
+      FmpAuthenticationLib|SecurityPkg/Library/FmpAuthenticationLibPkcs7/FmpAuthenticationLibPkcs7.inf
+  }
+  SignedCapsulePkg/Universal/SystemFirmwareUpdate/SystemFirmwareUpdateDxe.inf {
+    <LibraryClasses>
+      FmpAuthenticationLib|SecurityPkg/Library/FmpAuthenticationLibPkcs7/FmpAuthenticationLibPkcs7.inf
+  }
+  MdeModulePkg/Application/CapsuleApp/CapsuleApp.inf {
+    <LibraryClasses>
+      PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
+  }
+
+  #
+  # System Firmware Update
+  #
+  Silicon/Ampere/AmpereAltraPkg/Drivers/SystemFirmwareUpdateDxe/SystemFirmwareUpdateDxe.inf
+!endif
+
+  #
+  # In-band NVPARAM Access
+  #
+  Silicon/Ampere/AmpereAltraPkg/Drivers/NVParamRuntimeDxe/NVParamRuntimeDxe.inf
+
+  #
+  # Redfish
+  #
+!if $(REDFISH_ENABLE) == TRUE
+  MdeModulePkg/Bus/Usb/UsbNetwork/NetworkCommon/NetworkCommon.inf
+  MdeModulePkg/Bus/Usb/UsbNetwork/UsbCdcEcm/UsbCdcEcm.inf
+!include RedfishPkg/Redfish.dsc.inc
+!endif
+
+!if $(PERFORMANCE_MEASUREMENT_ENABLE) == TRUE
+  MdeModulePkg/Universal/Acpi/FirmwarePerformanceDataTablePei/FirmwarePerformancePei.inf
+  MdeModulePkg/Universal/Acpi/FirmwarePerformanceDataTableDxe/FirmwarePerformanceDxe.inf
+!if $(SHELL_ENABLE) == TRUE
+  ShellPkg/DynamicCommand/DpDynamicCommand/DpDynamicCommand.inf {
+    <PcdsFixedAtBuild>
+      gEfiShellPkgTokenSpaceGuid.PcdShellLibAutoInitialize|FALSE
+  }
+!endif
+!endif

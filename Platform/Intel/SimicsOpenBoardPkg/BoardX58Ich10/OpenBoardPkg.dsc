@@ -1,7 +1,7 @@
 ## @file
 #  The main build description file for the X58Ich10 board.
 #
-# Copyright (c) 2019 - 2023, Intel Corporation. All rights reserved.<BR>
+# Copyright (c) 2019 - 2025, Intel Corporation. All rights reserved.<BR>
 #
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -76,9 +76,7 @@
 !include $(PLATFORM_PACKAGE)/Include/Dsc/CorePeiInclude.dsc
 !include $(SKT_PKG)/SktPkgPei.dsc
 
-# @todo: Change below line to [Components.$(DXE_ARCH)] after https://bugzilla.tianocore.org/show_bug.cgi?id=2308
-#        is completed
-[Components.X64]
+[Components.$(DXE_ARCH)]
 !include $(PLATFORM_PACKAGE)/Include/Dsc/CoreDxeInclude.dsc
 
 #######################################
@@ -140,7 +138,6 @@
   # Silicon Package
   #####################################
   ReportCpuHobLib|IntelSiliconPkg/Library/ReportCpuHobLib/ReportCpuHobLib.inf
-  SmmAccessLib|IntelSiliconPkg/Feature/SmmAccess/Library/PeiSmmAccessLib/PeiSmmAccessLib.inf
 
   #####################################
   # Platform Package
@@ -211,7 +208,6 @@
   $(BOARD_PKG)/SecCore/SecMain.inf {
     <LibraryClasses>
       NULL|MdeModulePkg/Library/LzmaCustomDecompressLib/LzmaCustomDecompressLib.inf
-      NULL|MdePkg/Library/StackCheckLibNull/StackCheckLibNull.inf
   }
 
   $(BOARD_PKG)/SimicsPei/SimicsPei.inf {
@@ -222,9 +218,7 @@
 #######################################
 # DXE Components
 #######################################
-# @todo: Change below line to [Components.$(DXE_ARCH)] after https://bugzilla.tianocore.org/show_bug.cgi?id=2308
-#        is completed
-[Components.X64]
+[Components.$(DXE_ARCH)]
   #######################################
   # Edk2 Packages
   #######################################
